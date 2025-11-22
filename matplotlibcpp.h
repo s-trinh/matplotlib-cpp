@@ -470,6 +470,33 @@ bool plot(const std::vector<Numeric> &x, const std::vector<Numeric> &y, const st
     return res;
 }
 
+// FIXME: <https://stackoverflow.com/questions/76077363/why-does-matplotlib-cpp-throw-runtime-exceptions-in-the-3d-examples>
+//Given a figure, create a subplot with a 3d axis and return a pointer to that axis. also calls incref on the axis pointer.
+PyObject* init_3d_axis(PyObject *fig)
+{
+    PyObject *asp_kwargs = PyDict_New();
+    PyDict_SetItemString(asp_kwargs, "projection", PyString_FromString("3d"));
+
+    PyObject *asp = PyObject_GetAttrString(fig, "add_subplot");
+    Py_INCREF(asp);
+    PyObject *tmpax = PyObject_Call(asp, detail::_interpreter::get().s_python_empty_tuple, asp_kwargs);
+    Py_INCREF(tmpax);
+
+    PyObject *gca = PyObject_GetAttrString(fig, "gca");
+    if (!gca) throw std::runtime_error("No gca");
+    Py_INCREF(gca);
+    PyObject *axis = PyObject_Call(gca, detail::_interpreter::get().s_python_empty_tuple, detail::_interpreter::get().s_python_empty_tuple);
+
+    if (!axis) throw std::runtime_error("No axis");
+    Py_INCREF(axis);
+
+    Py_DECREF(gca);
+    Py_DECREF(tmpax);
+    Py_DECREF(asp);
+    return axis;
+}
+
+
 // TODO - it should be possible to make this work by implementing
 // a non-numpy alternative for `detail::get_2darray()`.
 #ifndef WITHOUT_NUMPY
@@ -555,6 +582,8 @@ void plot_surface(const std::vector<::std::vector<Numeric>> &x,
   Py_DECREF(fig_exists);
   if (!fig) throw std::runtime_error("Call to figure() failed.");
 
+  PyObject *axis = init_3d_axis(fig);
+  /*
   PyObject *gca_kwargs = PyDict_New();
   PyDict_SetItemString(gca_kwargs, "projection", PyString_FromString("3d"));
 
@@ -569,6 +598,7 @@ void plot_surface(const std::vector<::std::vector<Numeric>> &x,
 
   Py_DECREF(gca);
   Py_DECREF(gca_kwargs);
+  */
 
   PyObject *plot_surface = PyObject_GetAttrString(axis, "plot_surface");
   if (!plot_surface) throw std::runtime_error("No surface");
@@ -723,6 +753,8 @@ void plot3(const std::vector<Numeric> &x,
   }
   if (!fig) throw std::runtime_error("Call to figure() failed.");
 
+  PyObject *axis = init_3d_axis(fig);
+  /*
   PyObject *gca_kwargs = PyDict_New();
   PyDict_SetItemString(gca_kwargs, "projection", PyString_FromString("3d"));
 
@@ -737,6 +769,7 @@ void plot3(const std::vector<Numeric> &x,
 
   Py_DECREF(gca);
   Py_DECREF(gca_kwargs);
+  */
 
   PyObject *plot3 = PyObject_GetAttrString(axis, "plot");
   if (!plot3) throw std::runtime_error("No 3D line plot");
@@ -1126,6 +1159,8 @@ bool scatter(const std::vector<NumericX>& x,
   Py_DECREF(fig_exists);
   if (!fig) throw std::runtime_error("Call to figure() failed.");
 
+  PyObject *axis = init_3d_axis(fig);
+  /*
   PyObject *gca_kwargs = PyDict_New();
   PyDict_SetItemString(gca_kwargs, "projection", PyString_FromString("3d"));
 
@@ -1140,6 +1175,7 @@ bool scatter(const std::vector<NumericX>& x,
 
   Py_DECREF(gca);
   Py_DECREF(gca_kwargs);
+  */
 
   PyObject *plot3 = PyObject_GetAttrString(axis, "scatter");
   if (!plot3) throw std::runtime_error("No 3D line plot");
@@ -1503,6 +1539,8 @@ bool quiver(const std::vector<NumericX>& x, const std::vector<NumericY>& y, cons
                           detail::_interpreter::get().s_python_empty_tuple);
   if (!fig) throw std::runtime_error("Call to figure() failed.");
 
+  PyObject *axis = init_3d_axis(fig);
+  /*
   PyObject *gca_kwargs = PyDict_New();
   PyDict_SetItemString(gca_kwargs, "projection", PyString_FromString("3d"));
 
@@ -1516,6 +1554,7 @@ bool quiver(const std::vector<NumericX>& x, const std::vector<NumericY>& y, cons
   Py_INCREF(axis);
   Py_DECREF(gca);
   Py_DECREF(gca_kwargs);
+  */
 
   //plot our boys bravely, plot them strongly, plot them with a wink and clap
   PyObject *plot3 = PyObject_GetAttrString(axis, "quiver");
@@ -2526,7 +2565,7 @@ inline void set_zlabel(const std::string &str, const std::map<std::string, std::
     if (res) Py_DECREF(res);
 }
 
-inline void grid(bool flag)
+inline void grid(bool flag, const std::map<std::string, std::string>& keywords = std::map<std::string, std::string>())
 {
     detail::_interpreter::get();
 
@@ -2536,10 +2575,16 @@ inline void grid(bool flag)
     PyObject* args = PyTuple_New(1);
     PyTuple_SetItem(args, 0, pyflag);
 
-    PyObject* res = PyObject_CallObject(detail::_interpreter::get().s_python_function_grid, args);
+    PyObject* kwargs = PyDict_New();
+    for (auto it = keywords.begin(); it != keywords.end(); ++it) {
+        PyDict_SetItemString(kwargs, it->first.c_str(), PyUnicode_FromString(it->second.c_str()));
+    }
+
+    PyObject* res = PyObject_Call(detail::_interpreter::get().s_python_function_grid, args, kwargs);
     if(!res) throw std::runtime_error("Call to grid() failed.");
 
     Py_DECREF(args);
+    Py_DECREF(kwargs);
     Py_DECREF(res);
 }
 
