@@ -1870,7 +1870,7 @@ bool stem(const std::vector<Numeric>& y, const std::string& format = "")
 }
 
 template<typename Numeric>
-void text(Numeric x, Numeric y, const std::string& s = "")
+void text(Numeric x, Numeric y, const std::string& s = "", const std::map<std::string, std::string>& keywords = {})
 {
     detail::_interpreter::get();
 
@@ -1879,11 +1879,19 @@ void text(Numeric x, Numeric y, const std::string& s = "")
     PyTuple_SetItem(args, 1, PyFloat_FromDouble(y));
     PyTuple_SetItem(args, 2, PyString_FromString(s.c_str()));
 
-    PyObject* res = PyObject_CallObject(detail::_interpreter::get().s_python_function_text, args);
-    if(!res) throw std::runtime_error("Call to text() failed.");
+    // construct keyword args
+    PyObject* kwargs = PyDict_New();
+    for(std::map<std::string, std::string>::const_iterator it = keywords.begin(); it != keywords.end(); ++it)
+    {
+        PyDict_SetItemString(kwargs, it->first.c_str(), PyString_FromString(it->second.c_str()));
+    }
+
+    PyObject* res = PyObject_Call(detail::_interpreter::get().s_python_function_text, args, kwargs);
 
     Py_DECREF(args);
-    Py_DECREF(res);
+    Py_DECREF(kwargs);
+    if(res) Py_DECREF(res);
+    if(!res) throw std::runtime_error("Call to text() failed.");
 }
 
 inline void colorbar(PyObject* mappable = NULL, const std::map<std::string, float>& keywords = {})
